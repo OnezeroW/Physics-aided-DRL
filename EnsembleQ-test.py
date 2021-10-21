@@ -1,4 +1,3 @@
-from numpy.core.defchararray import rindex
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
