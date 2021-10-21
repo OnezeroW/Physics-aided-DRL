@@ -1,5 +1,8 @@
 # Physics-aided-DRL
 
+EnsembleQ-test.py is the main file used to train an RL model.
+
+
 python Collect-dataset.py > cd.log 2>&1 &
 
 python Initialize-model.py > im.log 2>&1 &
