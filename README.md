@@ -4,6 +4,10 @@ EnsembleQ-test.py is the main file used to train an RL model.
 
 Hyperparameters and functions are defined in utils.py.
 
+ND-compare.py evaluates the performance of AMIX-ND algorithm.
+
+Trained-model.py evaluates the performance of NN-based algorithms.
+
 
 >python Collect-dataset.py > cd.log 2>&1 &
 
