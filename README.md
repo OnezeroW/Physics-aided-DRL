@@ -2,6 +2,8 @@
 
 EnsembleQ-test.py is the main file used to train an RL model.
 
+Hyperparameters and functions are defined in utils.py.
+
 
 >python Collect-dataset.py > cd.log 2>&1 &
 
