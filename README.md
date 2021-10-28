@@ -9,7 +9,7 @@ ND-compare.py evaluates the performance of AMIX-ND algorithm.
 Trained-model.py evaluates the performance of NN-based algorithms.
 
 
->python ND-compare.py --findex 1 --adjust 0 > ndc.log 2>&1 &
+>python ND-compare.py --findex 1 --adjust 0 > ndc.log 2>&1 & \\
 >python ND-compare.py --findex 2 --adjust 0 > ndc.log 2>&1 &
 >python ND-compare.py --findex 3 --adjust 0 > ndc.log 2>&1 &
 
