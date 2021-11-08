@@ -79,5 +79,5 @@ with open('Training-loss.txt', 'a+') as f:
 with open('Test-loss.txt', 'a+') as f:
     for item in testloss:
         f.write(str(item)+'\n')
-torch.save(initialNet.state_dict(), 'initialized-actor-4-64.pkl')
+torch.save(initialNet.state_dict(), 'initialized-actor.pkl')
 print('Training model complete. Model saved.')
