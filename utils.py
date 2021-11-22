@@ -4,19 +4,35 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+epsilon = 0.05  # action exploration: randomly select one link with probability epsilon
 
+
+# 2 links
 NUM_OF_LINKS=2
 MAX_DEADLINE=5
 d_max = [5, 5]
-LAMBDA = [0.75, 0.75]
+# LAMBDA = [0.75, 0.75]
+LAMBDA = [1.2, 0.3]
+# INIT_P = [0.6, 0.6]
+INIT_P = [0.99, 0.5]
 wt = [1, 1]
 wt_pnt = [1, 1]      # weight of penalty
-INIT_P = [0.6, 0.6]
-epsilon = 0.05  # action exploration: randomly select one link with probability epsilon
-# DELTA = 0.1
-# px = 0.55
-# INIT_P = [np.min([px+DELTA, 1]), px]
+
+# # 5 links
+# NUM_OF_LINKS=5
+# MAX_DEADLINE=10
+# d_max = [10, 10, 10, 10, 10]
+# # LAMBDA = [0.75, 0.75]
+# LAMBDA = [0.3, 0.3, 0.3, 0.3, 0.3]
+# INIT_P = [0.6, 0.6, 0.6, 0.6, 0.6]
+# wt = [1, 1, 1, 1, 1]
+# wt_pnt = [1, 1, 1, 1, 1]      # weight of penalty
+
+
+
+
+
 
 
 
@@ -76,8 +92,8 @@ class Actor(nn.Module):
         self.layer2.weight.data.normal_(0, 0.02)
         self.layer3 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
         self.layer3.weight.data.normal_(0, 0.02)
-        self.layer4 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
-        self.layer4.weight.data.normal_(0, 0.02)
+        # self.layer4 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
+        # self.layer4.weight.data.normal_(0, 0.02)
         self.action = nn.Linear(HIDDEN_SIZE, N_ACTIONS)
         self.action.weight.data.normal_(0, 0.02)
 
@@ -88,8 +104,8 @@ class Actor(nn.Module):
         x = F.relu(x)
         x = self.layer3(x)
         x = F.relu(x)
-        x = self.layer4(x)
-        x = F.relu(x)
+        # x = self.layer4(x)
+        # x = F.relu(x)
         x = self.action(x)
         # x = torch.clamp(x, -bound, bound) # clip input of softmax to avoid nan
         # action_probs = F.softmax(x, dim=-1)
@@ -106,8 +122,8 @@ class Actor_no_gs(nn.Module):
         self.layer2.weight.data.normal_(0, 0.02)
         self.layer3 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
         self.layer3.weight.data.normal_(0, 0.02)
-        self.layer4 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
-        self.layer4.weight.data.normal_(0, 0.02)
+        # self.layer4 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
+        # self.layer4.weight.data.normal_(0, 0.02)
         self.action = nn.Linear(HIDDEN_SIZE, N_ACTIONS)
         self.action.weight.data.normal_(0, 0.02)
 
@@ -118,8 +134,8 @@ class Actor_no_gs(nn.Module):
         x = F.relu(x)
         x = self.layer3(x)
         x = F.relu(x)
-        x = self.layer4(x)
-        x = F.relu(x)
+        # x = self.layer4(x)
+        # x = F.relu(x)
         x = self.action(x)
         # action_binary = F.gumbel_softmax(x, tau=1, hard=True, eps=1e-10, dim=-1)
         # return action_binary
@@ -135,8 +151,8 @@ class Critic(nn.Module):
         self.layer2.weight.data.normal_(0, 0.02)
         self.layer3 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
         self.layer3.weight.data.normal_(0, 0.02)
-        self.layer4 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
-        self.layer4.weight.data.normal_(0, 0.02)
+        # self.layer4 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
+        # self.layer4.weight.data.normal_(0, 0.02)
         self.value = nn.Linear(HIDDEN_SIZE, 1)
         self.value.weight.data.normal_(0, 0.02)
 
@@ -147,8 +163,8 @@ class Critic(nn.Module):
         x = F.relu(x)
         x = self.layer3(x)
         x = F.relu(x)
-        x = self.layer4(x)
-        x = F.relu(x)
+        # x = self.layer4(x)
+        # x = F.relu(x)
         state_value = self.value(x)
         return state_value
 
@@ -602,11 +618,14 @@ def perform_func(findex, wt, p_next, INIT_P, wt_pnt):   # performance metric
     elif findex == 4:                           # case 1 with penalty-1
         performance = np.inner(wt, p_next)
         for idx in range(NUM_OF_LINKS):
-            performance += np.max(wt) * np.min([0, p_next[idx] - INIT_P[idx]])
+            # performance += np.max(wt) * np.min([0, p_next[idx] - INIT_P[idx]])
+            performance += wt[idx] * np.min([0, p_next[idx] - INIT_P[idx]])
     elif findex == 5:                           # case 1 with penalty-1
         performance = np.inner(wt, p_next)
         for idx in range(NUM_OF_LINKS):
             performance += wt_pnt[idx] * np.min([0, p_next[idx] - INIT_P[idx]])
+    elif findex == 6:
+        performance = np.min(p_next / np.array(INIT_P))
     # elif findex == 5:                           # case 1 with penalty-2
     #     performance = np.inner(wt, p_next)
     #     for idx in range(NUM_OF_LINKS):
