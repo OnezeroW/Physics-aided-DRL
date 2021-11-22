@@ -86,12 +86,14 @@ def reward_func(rindex, wt, p_next, p_current, INIT_P, a, wt_pnt):  # a is an in
         r = wt[a] * p_next[a]
         for idx in range(NUM_OF_LINKS):
             if idx != a:
-                r += np.max(wt) * np.min([0, p_next[idx] - INIT_P[idx]])    # performace metric 1 with penalty
+                # r += np.max(wt) * np.min([0, p_next[idx] - INIT_P[idx]])    # performace metric 1 with penalty
+                r += wt[idx] * np.min([0, p_next[idx] - INIT_P[idx]])
     elif rindex == 10:
         r = wt[a] * (p_next[a] - p_current[a])
         for idx in range(NUM_OF_LINKS):
             if idx != a:
-                r += np.max(wt) * np.min([0, p_next[idx] - INIT_P[idx]])    # performace metric 1 with penalty
+                # r += np.max(wt) * np.min([0, p_next[idx] - INIT_P[idx]])    # performace metric 1 with penalty
+                r += wt[idx] * np.min([0, p_next[idx] - INIT_P[idx]])
     elif rindex == 11:
         r = wt[a] * p_next[a]
         for idx in range(NUM_OF_LINKS):
@@ -102,6 +104,8 @@ def reward_func(rindex, wt, p_next, p_current, INIT_P, a, wt_pnt):  # a is an in
         for idx in range(NUM_OF_LINKS):
             if idx != a:
                 r += wt_pnt[idx] * np.min([0, p_next[idx] - INIT_P[idx]])    # performace metric 1 with penalty
+    elif rindex == 13:
+        r = np.min(p_next / np.array(INIT_P))
     # elif rindex == 5:
     #     r = np.inner(wt, p_next - p_current) - wt[a] * np.min([0, p_current[a] - INIT_P[a]])
     # elif rindex == 6:
