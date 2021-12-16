@@ -1,3 +1,4 @@
+import wandb
 import torch
 from torch import tensor
 import torch.nn as nn
@@ -106,6 +107,8 @@ def reward_func(rindex, wt, p_next, p_current, INIT_P, a, wt_pnt):  # a is an in
                 r += wt_pnt[idx] * np.min([0, p_next[idx] - INIT_P[idx]])    # performace metric 1 with penalty
     elif rindex == 13:
         r = np.min(p_next / np.array(INIT_P))
+    elif rindex == 14:
+        r = np.min(p_next / np.array(INIT_P)) - np.min(p_current / np.array(INIT_P))
     # elif rindex == 5:
     #     r = np.inner(wt, p_next - p_current) - wt[a] * np.min([0, p_current[a] - INIT_P[a]])
     # elif rindex == 6:
@@ -138,7 +141,10 @@ def run_exp(seed=0, NUM_Q=2, NUM_MIN=2, adaeq=0, tp=0.001, lr=3e-4, alpha=0, gam
     for q_i in range(NUM_Q):
         optimizerQ_list.append(optim.Adam(q_net_list[q_i].parameters(), lr=lr))
     mse_criterion = nn.MSELoss()
-    Q_estimation_error = []
+
+    wandb.watch(actor, log='all')
+    for q_i in range(NUM_Q):
+        wandb.watch(q_net_list[q_i], log='all')
 
 
     utils.init_state(Buffer, Deficit, totalArrival, totalDelivered,
@@ -157,7 +163,9 @@ def run_exp(seed=0, NUM_Q=2, NUM_MIN=2, adaeq=0, tp=0.001, lr=3e-4, alpha=0, gam
         s = utils.generate_state(Deficit, e)
 
         for t in range(100):
-            dist = actor(s.to(device)).detach().cpu()   # dist is action_binary, of which only the a^{th} entry is 1.
+            s_normalized = torch.sigmoid(s)
+            dist = actor(s_normalized.to(device)).detach().cpu()
+            # dist = actor(s.to(device)).detach().cpu()   # dist is action_binary, of which only the a^{th} entry is 1.
             try:
                 a = torch.multinomial(dist, 1).item()
             except:
@@ -196,7 +204,10 @@ def run_exp(seed=0, NUM_Q=2, NUM_MIN=2, adaeq=0, tp=0.001, lr=3e-4, alpha=0, gam
             if eval_step % eval_interval == 0:
                 torch.save(actor.state_dict(), 'actor-r-'+str(rindex)+'-gamma-'+str(gamma)+'-init-'+str(init)+'-eval-'+str(eval_step)+'.pkl')
 
-            dist = actor(s.to(device)).detach().cpu()
+            s_normalized = torch.sigmoid(s)
+            dist = actor(s_normalized.to(device)).detach().cpu()
+            # dist = actor(s.to(device)).detach().cpu()
+            wandb.log({'step': train_t*LEN_EPISODE+len, 'state': s, 'normalized_state': s_normalized, 'prob_vector': dist})
 
             if explore == 1:                    # exploration with probability epsilon
                 exploration = rd.uniform(0,1)
@@ -214,6 +225,7 @@ def run_exp(seed=0, NUM_Q=2, NUM_MIN=2, adaeq=0, tp=0.001, lr=3e-4, alpha=0, gam
                                 sumArrival, Action, sumAction, totalBuff, a, LAMBDA, INIT_P, d_max
                                 )
             r = reward_func(rindex, wt, p_next, p_current, INIT_P, a, wt_pnt)
+            wandb.log({'step': train_t*LEN_EPISODE+len, 'state': s, 'action': a, 'reward': r})
             utils.update_dynamics_new_arrival(Buffer, Deficit, totalArrival, totalDelivered, p_next, e, Arrival, 
                                 sumArrival, Action, sumAction, totalBuff, a, LAMBDA, INIT_P, d_max
                                 )
@@ -236,30 +248,17 @@ def run_exp(seed=0, NUM_Q=2, NUM_MIN=2, adaeq=0, tp=0.001, lr=3e-4, alpha=0, gam
             b_s_ = Variable(torch.FloatTensor(b_memory[:, N_STATES+N_ACTIONS+1:2*N_STATES+N_ACTIONS+1]))
             b_s_ = b_s_.to(device)
 
-            # update critics/q_nets every step
-            # update_a = torch.zeros(BATCH_SIZE, dtype=torch.int)
-            # update_log_prob = torch.zeros(BATCH_SIZE)
-            # update_dist = actor(b_s_).cpu()     # next state -> next action -> log prob
-
-            # print('b_s: ', b_s, ', dist: ', update_dist)
-
-            # for j in range(BATCH_SIZE):
-            #     try:
-            #         update_a[j] = torch.multinomial(update_dist[j], 1).item()     # use cpu for sampling
-            #     except:
-            #         print("ERROR! ", len, j, update_dist[j])
-            #     update_log_prob[j] = torch.log(update_dist[j,int(update_a[j])])
-            # update_a = update_a.reshape([BATCH_SIZE,1])
-            # update_a = update_a.to(device)
-            # update_log_prob = update_log_prob.reshape([BATCH_SIZE,1])
-            # update_log_prob = update_log_prob.to(device)
-            update_a = actor(b_s_)     # next state -> next action -> log prob
+            # update_a = actor(b_s_)     # next state -> next action -> log prob
+            s_normalized = torch.sigmoid(b_s_)
+            update_a = actor(s_normalized)
 
             # select M out of N q_nets
             sample_idxs = np.random.choice(NUM_Q, NUM_MIN, replace=False)
             q_prediction_next_list = []
             for sample_idx in sample_idxs:                      # use truncated rollout to get a better estimation of q_prediction_next. 09/08/2021
-                q_prediction_next = q_target_net_list[sample_idx](torch.cat((b_s_, update_a), 1))
+                sa_normalized = torch.sigmoid(torch.cat((b_s_, update_a), 1))
+                q_prediction_next = q_target_net_list[sample_idx](sa_normalized)
+                # q_prediction_next = q_target_net_list[sample_idx](torch.cat((b_s_, update_a), 1))
                 q_prediction_next_list.append(q_prediction_next)
             q_prediction_next_cat = torch.cat(q_prediction_next_list, 1)
             min_q, min_indices = torch.min(q_prediction_next_cat, dim=1, keepdim=True)
@@ -269,13 +268,16 @@ def run_exp(seed=0, NUM_Q=2, NUM_MIN=2, adaeq=0, tp=0.001, lr=3e-4, alpha=0, gam
             #     print('len=', len, '\n target_q=', y_q.transpose(0,1), '\n min_q=', min_q.transpose(0,1), flush=True)
             q_prediction_list = []
             for q_i in range(NUM_Q):
-                q_prediction = q_net_list[q_i](torch.cat((b_s, b_a), 1))
+                sa_normalized = torch.sigmoid(torch.cat((b_s, b_a), 1))
+                q_prediction = q_net_list[q_i](sa_normalized)
+                # q_prediction = q_net_list[q_i](torch.cat((b_s, b_a), 1))
                 q_prediction_list.append(q_prediction)
 
             q_prediction_cat = torch.cat(q_prediction_list, dim=1)
             y_q = y_q.expand((-1, NUM_Q)) if y_q.shape[1] == 1 else y_q
             q_loss_all = mse_criterion(q_prediction_cat, y_q.detach()) * NUM_Q   # total loss function of N q_nets
             print('critic loss: ', q_loss_all)
+            wandb.log({'step': train_t*LEN_EPISODE+len, 'critic loss': q_loss_all})
             # test_s = np.array([1,1,1,1])
             # test_a = np.array([0,1])
             # test_input = np.concatenate((test_s, test_a))
@@ -310,17 +312,23 @@ def run_exp(seed=0, NUM_Q=2, NUM_MIN=2, adaeq=0, tp=0.001, lr=3e-4, alpha=0, gam
                 # a_tilda = a_tilda.to(device)
                 # log_prob_tilda = log_prob_tilda.reshape([BATCH_SIZE,1])
                 # log_prob_tilda = log_prob_tilda.to(device)
-                a_tilda = actor(b_s)     # current state -> action -> log prob
+
+                s_normalized = torch.sigmoid(b_s)
+                a_tilda = actor(s_normalized)
+                # a_tilda = actor(b_s)     # current state -> action -> log prob
 
                 q_a_tilda_list = []
                 for sample_idx in range(NUM_Q):
-                    q_a_tilda = q_net_list[sample_idx](torch.cat((b_s, a_tilda), 1))
+                    sa_normalized = torch.sigmoid(torch.cat((b_s, a_tilda), 1))
+                    q_a_tilda = q_net_list[sample_idx](sa_normalized)
+                    # q_a_tilda = q_net_list[sample_idx](torch.cat((b_s, a_tilda), 1))
                     q_a_tilda_list.append(q_a_tilda)
                 q_a_tilda_cat = torch.cat(q_a_tilda_list, 1)
                 ave_q = torch.mean(q_a_tilda_cat, dim=1, keepdim=True)
                 # actor_loss = (log_prob_tilda * alpha - ave_q).mean()    # as in REDQ, not acsent but descent
                 actor_loss = - ave_q.mean()
                 print('actor loss: ', actor_loss)
+                wandb.log({'step': train_t*LEN_EPISODE+len, 'actor loss': actor_loss})
                 
                 # test_s = np.array([1,1,1,1])
                 # test_input = torch.FloatTensor(test_s)
@@ -334,6 +342,7 @@ def run_exp(seed=0, NUM_Q=2, NUM_MIN=2, adaeq=0, tp=0.001, lr=3e-4, alpha=0, gam
                 # actor.requires_grad_(True)
                 for name, params in actor.named_parameters():
                     print('-->name:', name, '-->grad_requirs:', params.requires_grad, '-->grad_value:', params.grad)
+                # wandb.log({'step': train_t*LEN_EPISODE+len, 'actor gradients': actor.named_parameters()})
                 
                 torch.nn.utils.clip_grad_value_(actor.parameters(), clip)  # gradient clipping
                 
