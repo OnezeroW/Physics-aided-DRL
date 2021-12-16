@@ -1,21 +1,43 @@
 import numpy as np
 import random as rd
+import wandb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+default_config = dict(
+    NUM_OF_LINKS=2,
+    MAX_DEADLINE=5,
+    d_max = [5, 5],
+    LAMBDA = [0.75, 0.75],
+    # LAMBDA = [1.2, 0.3],
+    # INIT_P = [0.6, 0.6],
+    # INIT_P = [0.9, 0.5],
+    INIT_P = [0.7, 0.4]
+)
+wandb.init(config=default_config)
+
+NUM_OF_LINKS = wandb.config.NUM_OF_LINKS
+MAX_DEADLINE = wandb.config.MAX_DEADLINE
+d_max = wandb.config.d_max
+LAMBDA = wandb.config.LAMBDA
+INIT_P = wandb.config.INIT_P
+
+
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 epsilon = 0.05  # action exploration: randomly select one link with probability epsilon
 
-
-# 2 links
-NUM_OF_LINKS=2
-MAX_DEADLINE=5
-d_max = [5, 5]
+# # 2 links
+# NUM_OF_LINKS=2
+# MAX_DEADLINE=5
+# d_max = [5, 5]
 # LAMBDA = [0.75, 0.75]
-LAMBDA = [1.2, 0.3]
-# INIT_P = [0.6, 0.6]
-INIT_P = [0.99, 0.5]
+# # LAMBDA = [1.2, 0.3]
+# # INIT_P = [0.6, 0.6]
+# # INIT_P = [0.9, 0.5]
+# INIT_P = [0.7, 0.4]
+
 wt = [1, 1]
 wt_pnt = [1, 1]      # weight of penalty
 
@@ -28,11 +50,6 @@ wt_pnt = [1, 1]      # weight of penalty
 # INIT_P = [0.6, 0.6, 0.6, 0.6, 0.6]
 # wt = [1, 1, 1, 1, 1]
 # wt_pnt = [1, 1, 1, 1, 1]      # weight of penalty
-
-
-
-
-
 
 
 
@@ -54,8 +71,8 @@ wt_pnt = [1, 1]      # weight of penalty
 # px = 0.60
 # INIT_P = [0.9, 0.9, px, px, px, px]
 
-# HIDDEN_SIZE = 256    # the dim of hidden layers
-HIDDEN_SIZE = 64    # the dim of hidden layers
+# HIDDEN_SIZE = 64    # the dim of hidden layers
+HIDDEN_SIZE = 8    # the dim of hidden layers
 LR = 1e-4            # learning rate of RL algorithm
 
 Buffer = np.zeros((NUM_OF_LINKS, MAX_DEADLINE+2), dtype=np.float)   # 1 <= d <= d_max, Buffer[l][0]=0, Buffer[l][d_max+1]=0
@@ -82,29 +99,25 @@ NUM_OF_AGENT=1
 polyak = 0.99   # update target networks
 # wi = 0.02
 # wi = 1 / HIDDEN_SIZE
-# wi = 2 / HIDDEN_SIZE
+wi = 2 / HIDDEN_SIZE
 class Actor(nn.Module):
     def __init__(self, ):
         super(Actor, self).__init__()
         self.layer1 = nn.Linear(N_STATES, HIDDEN_SIZE)
-        self.layer1.weight.data.normal_(0, 0.02)
-        self.layer2 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
-        self.layer2.weight.data.normal_(0, 0.02)
-        self.layer3 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
-        self.layer3.weight.data.normal_(0, 0.02)
-        # self.layer4 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
-        # self.layer4.weight.data.normal_(0, 0.02)
+        self.layer1.weight.data.normal_(0, wi)
+        # self.layer2 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
+        # self.layer2.weight.data.normal_(0, wi)
+        # self.layer3 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
+        # self.layer3.weight.data.normal_(0, wi)
         self.action = nn.Linear(HIDDEN_SIZE, N_ACTIONS)
-        self.action.weight.data.normal_(0, 0.02)
+        self.action.weight.data.normal_(0, wi)
 
     def forward(self, x):
         x = self.layer1(x)
         x = F.relu(x)
-        x = self.layer2(x)
-        x = F.relu(x)
-        x = self.layer3(x)
-        x = F.relu(x)
-        # x = self.layer4(x)
+        # x = self.layer2(x)
+        # x = F.relu(x)
+        # x = self.layer3(x)
         # x = F.relu(x)
         x = self.action(x)
         # x = torch.clamp(x, -bound, bound) # clip input of softmax to avoid nan
@@ -117,27 +130,23 @@ class Actor_no_gs(nn.Module):
     def __init__(self, ):
         super(Actor_no_gs, self).__init__()
         self.layer1 = nn.Linear(N_STATES, HIDDEN_SIZE)
-        self.layer1.weight.data.normal_(0, 0.02)
-        self.layer2 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
-        self.layer2.weight.data.normal_(0, 0.02)
-        self.layer3 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
-        self.layer3.weight.data.normal_(0, 0.02)
-        # self.layer4 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
-        # self.layer4.weight.data.normal_(0, 0.02)
+        self.layer1.weight.data.normal_(0, wi)
+        # self.layer2 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
+        # self.layer2.weight.data.normal_(0, wi)
+        # self.layer3 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
+        # self.layer3.weight.data.normal_(0, wi)
         self.action = nn.Linear(HIDDEN_SIZE, N_ACTIONS)
-        self.action.weight.data.normal_(0, 0.02)
+        self.action.weight.data.normal_(0, wi)
 
     def forward(self, x):
         x = self.layer1(x)
         x = F.relu(x)
-        x = self.layer2(x)
-        x = F.relu(x)
-        x = self.layer3(x)
-        x = F.relu(x)
-        # x = self.layer4(x)
+        # x = self.layer2(x)
+        # x = F.relu(x)
+        # x = self.layer3(x)
         # x = F.relu(x)
         x = self.action(x)
-        # action_binary = F.gumbel_softmax(x, tau=1, hard=True, eps=1e-10, dim=-1)
+        # action_binary = F.gumbel_softmax(x, tau=0.01, hard=True, eps=1e-10, dim=-1)
         # return action_binary
         return x
 
@@ -146,24 +155,20 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
         # self.layer1 = nn.Linear(N_STATES + 1, HIDDEN_SIZE)    # input: state, action
         self.layer1 = nn.Linear(N_STATES + N_ACTIONS, HIDDEN_SIZE)    # input: state, action
-        self.layer1.weight.data.normal_(0, 0.02)
+        self.layer1.weight.data.normal_(0, wi)
         self.layer2 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
-        self.layer2.weight.data.normal_(0, 0.02)
-        self.layer3 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
-        self.layer3.weight.data.normal_(0, 0.02)
-        # self.layer4 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
-        # self.layer4.weight.data.normal_(0, 0.02)
+        self.layer2.weight.data.normal_(0, wi)
+        # self.layer3 = nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE)
+        # self.layer3.weight.data.normal_(0, wi)
         self.value = nn.Linear(HIDDEN_SIZE, 1)
-        self.value.weight.data.normal_(0, 0.02)
+        self.value.weight.data.normal_(0, wi)
 
     def forward(self, x):
         x = self.layer1(x)
         x = F.relu(x)
         x = self.layer2(x)
         x = F.relu(x)
-        x = self.layer3(x)
-        x = F.relu(x)
-        # x = self.layer4(x)
+        # x = self.layer3(x)
         # x = F.relu(x)
         state_value = self.value(x)
         return state_value
