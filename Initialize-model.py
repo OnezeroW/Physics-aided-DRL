@@ -56,7 +56,10 @@ for epoch in range(NUM_EPOCH):
     b_s = b_s.to(device)
     b_ap = Variable(torch.FloatTensor(b_memory[:, -N_ACTIONS:]))
     b_ap = b_ap.to(device)
-    b_net = initialNet(b_s)
+
+    s_normalized = torch.sigmoid(b_s)
+    b_net = initialNet(s_normalized)
+    # b_net = initialNet(b_s)
     loss = criterion(b_net, b_ap)
     if epoch % 100 == 0:
         trainingloss.append(loss.item())
@@ -68,7 +71,10 @@ for epoch in range(NUM_EPOCH):
     test_s = test_s.to(device)
     test_ap = Variable(torch.FloatTensor(testset[:, -N_ACTIONS:]))
     test_ap = test_ap.to(device)
-    test_net = initialNet(test_s)
+
+    s_normalized = torch.sigmoid(test_s)
+    test_net = initialNet(s_normalized)
+    # test_net = initialNet(test_s)
     tloss = criterion(test_net, test_ap)
     if epoch % 100 == 0:
         testloss.append(tloss.item())
