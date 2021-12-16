@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import random as rd
 import utils
+import torch.nn.functional as F
 
 device = utils.device
 
@@ -49,7 +50,9 @@ def run_trained_model(model, findex):
         s = utils.generate_state(Deficit, e)    # current state
 
         for len in range(LEN_EPISODE):  #length of each episode
-            dist = initialNet(s.to(device)).detach().cpu()
+            s_normalized = torch.sigmoid(s)
+            dist = initialNet(s_normalized.to(device)).detach().cpu()
+            # dist = initialNet(s.to(device)).detach().cpu()
             try:
                 a = torch.multinomial(dist, 1).item()
             except:
